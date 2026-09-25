@@ -10,6 +10,7 @@ import os
 import subprocess
 import time
 import urllib.request
+from email.utils import parsedate_to_datetime
 from urllib.parse import urlparse
 
 HUMAN_TITLES = ("access to this page has been denied", "just a moment", "attention required", "are you a robot",
@@ -35,6 +36,24 @@ class HumanCheckTimeout(RuntimeError):
 
 class Cancelled(RuntimeError):
     """The user cancelled the job during a page load."""
+
+
+class SiteBlocked(RuntimeError):
+    """The page or its own listing response returned a block/rate limit. Do not navigate again."""
+
+    def __init__(self, status, retry_after=0):
+        super().__init__(f"HTTP {status}: site blocked or rate-limited this load")
+        self.retry_after = retry_after
+
+
+def retry_after_seconds(headers):
+    value = next((str(v) for k, v in (headers or {}).items() if k.lower() == "retry-after"), "")
+    if value.isdigit():
+        return int(value)
+    try:
+        return max(0, parsedate_to_datetime(value).timestamp() - time.time())
+    except (ValueError, TypeError, OverflowError):
+        return 0
 
 
 def launch_dedicated(cdp_url, profile_dir):
@@ -165,7 +184,9 @@ class Tab:
         emit = on_event or (lambda *_: None)
         stop = cancelled or (lambda: False)
         self.chrome.drain()
-        self.call("Page.navigate", timeout=NAVIGATE_TIMEOUT, url=url)
+        navigation = self.call("Page.navigate", timeout=NAVIGATE_TIMEOUT, url=url)
+        main_frame = navigation.get("frameId")
+        blocked = None
         pending, responses, done_ids = {}, [], set()
         self.dropped_events = False
         human, human_deadline = False, None
@@ -184,6 +205,14 @@ class Tab:
                     continue
                 method, params = event.get("method"), event.get("params") or {}
                 request_id = params.get("requestId")
+                if method == "Network.responseReceived":
+                    response = params.get("response") or {}
+                    # Ignore ads, image/CDN failures and subframes. Only the main document or listing API counts.
+                    is_document = bool(main_frame and params.get("type") == "Document"
+                                       and params.get("frameId") == main_frame)
+                    is_listing = request_id in pending or capture(response.get("url", ""))
+                    if response.get("status") in (403, 429) and (is_document or is_listing):
+                        blocked = SiteBlocked(response["status"], retry_after_seconds(response.get("headers")))
                 if request_id in done_ids:
                     continue
                 if method == "Network.requestWillBeSent" and capture(params.get("request", {}).get("url", "")):
@@ -218,7 +247,10 @@ class Tab:
                 else:
                     if human_deadline is not None:
                         human_deadline = None
+                        blocked = None  # The user completed this page's check; no new navigation is made.
                         emit("human_check_done", url)
+                    if blocked is not None:
+                        raise blocked
                     if ready != "complete" or href in ("", "about:blank"):
                         loaded_at = None  # Still the old blank page, or the new page is still loading.
                     elif loaded_at is None:

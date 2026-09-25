@@ -47,7 +47,7 @@ def _score(qid, answer, top):
     probabilities = answer.get("probabilities") or {}
     score, confidence = answer.get("score"), answer.get("confidence")
     valid = (
-        set(probabilities) == {str(i) for i in range(top + 1)}
+        isinstance(probabilities, dict) and set(probabilities) == {str(i) for i in range(top + 1)}
         and all(_finite(v) and 0 <= v <= 1 for v in probabilities.values())
         and abs(sum(probabilities.values()) - 1) < 0.02
         and _finite(score) and -1e-6 <= score <= top + 1e-6
@@ -61,6 +61,8 @@ def _score(qid, answer, top):
 
 def validate(answers, questions=None):
     """Check every answer's shape; normalize Scores to 0..1 by their top level."""
+    if not isinstance(answers, dict):
+        raise JevError("Jev returned invalid answers")
     out = {}
     for qid, question in (questions or QUESTIONS).items():
         answer = (answers or {}).get(qid)

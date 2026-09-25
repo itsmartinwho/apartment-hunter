@@ -8,7 +8,7 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
-from . import areas, jev, subway
+from . import areas, jev, preferences, subway
 from .config import STATIC, load_env, settings
 from .criteria import (
     AMENITIES,
@@ -62,8 +62,9 @@ def clean_tiers(tiers):
 
 
 class App:
-    def __init__(self, store, hunter):
+    def __init__(self, store, hunter, interpret_preferences=preferences.interpret):
         self.store, self.hunter = store, hunter
+        self.interpret_preferences = interpret_preferences
 
     def tiers(self, override=None):
         """Default tiers, then saved tiers, then tiers sent with the request. Values must be 1 to 4."""
@@ -95,7 +96,7 @@ class App:
             "stations": list(stations.values()),
             "last_search": self.store.last_run("search"),
             "settings": {"chrome_mode": settings()["chrome_mode"], "vision_model": settings()["vision_model"],
-                         "typesafe_model": settings()["typesafe_model"]},
+                         "typesafe_model": settings()["typesafe_model"], "text_model": settings()["text_model"]},
         }
 
     def rank(self, body):
@@ -135,6 +136,11 @@ class App:
             return {"ok": True}
         if path == "/api/settings":
             return self.save_settings(body)
+        if path == "/api/preferences":
+            # A preview only: neither persist settings nor start a search here.
+            return self.interpret_preferences(
+                body.get("text"), body.get("limits") or {}, body.get("weights") or {},
+                self.tiers(body.get("tiers") if isinstance(body.get("tiers"), dict) else None))
         if path == "/api/interpret":
             try:
                 return jev.interpret(str(body.get("text") or ""), clean_weights(body.get("weights") or {}))

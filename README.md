@@ -11,7 +11,7 @@ uv run hunt
 
 The page opens at http://127.0.0.1:8777. When you click Search for the first time, Chrome asks "Allow remote debugging?". Click **Allow**. Chrome asks again only when the connection restarts, for example after Chrome restarts. The tool works in its own background tabs; it never attaches to your open tabs. While it is connected, it keeps one blank background tab open for the connection.
 
-`.env` holds the keys (copied from `jev-ultrafast`): `TYPESAFE_API_KEY` for Jev and `TEXT_MODEL_API_KEY` (OpenRouter) for the vision model. See `.env.example`.
+`.env` holds the keys (copied from `jev-ultrafast`): `TYPESAFE_API_KEY` for Jev and `TEXT_MODEL_API_KEY` (OpenRouter) for the small text helper and, unless overridden, the vision model. See `.env.example`.
 
 To check the keys, Jev, and the Chrome connection:
 
@@ -23,7 +23,7 @@ uv run hunt --check
 
 1. Set your **limits** in the left panel: rent range, bedrooms, bathrooms, size, move-in window, areas, lowest tier, walk to the subway, must-haves, and sources.
 2. Click **Search**. The tool loads one StreetEasy page and one Zillow page in a background tab of your Chrome. This takes about 30 seconds.
-3. Move the **priority** sliders. The list and the map re-rank at once. No page loads. To let the tool optimize everything inside your limits, click the **Balanced** preset. Other presets: Best value, Location, Light and views, Space, New and renovated. You can also type what matters in plain words ("I work from home, so light matters most; I bike, so the subway does not matter") and click **Set priorities**. Jev reads the text and moves the sliders in about 0.4 seconds.
+3. Move the **priority** sliders. The list and the map re-rank at once. No page loads. To let the tool optimize everything inside your limits, click the **Balanced** preset. Other presets: Best value, Location, Light and views, Space, New and renovated. Use **Describe your search** at the top of the left panel to change limits, priorities, and neighborhood tiers in words. For example: "Chelsea or West Village, under $6,500, at least one bedroom; light matters most." Click **Preview changes**, review the changes and any clarification notes, then **Apply changes**. **Undo** restores the previous settings unless you have made subsequent edits. You can type or use your keyboard’s dictation. This only re-ranks saved listings; it never starts Search or Inspect.
 4. Click **Inspect top N**. The tool downloads photos of the top listings and asks the vision model and Jev to judge views, light, window size, renovation, and space. This takes about 20 seconds for 25 listings and costs about 2 cents.
 5. For a listing you like, click **Deep look**. The tool opens that listing page, reads the description and all photos, and inspects it again.
 6. Edit the **neighborhood tiers** to match your taste. Tier 1 is best.
@@ -36,9 +36,19 @@ StreetEasy and Zillow check for bots. In a Chrome tab under automation, the firs
 
 - It never solves or hides from a human check. When one appears, it brings that tab to the front and waits up to 5 minutes for you. If you do not complete it, the tool skips that site and keeps the other results.
 - It sends no requests of its own to StreetEasy or Zillow. It reads the data that a normal page load already contains, plus the responses to the page's own requests.
+- Identical successful search pages are cached for 10 minutes, including across server restarts. Reusing cached pages does not refresh listing timestamps or overwrite newer captures.
+- A human check, even when completed, pauses further loads on that site for at least 15 minutes. A 403/429 on the main document or a captured listing response also starts this cooldown; a longer `Retry-After` is honored. The tool can finish reading the current page after you complete its check, but does not automatically retry later. Search and Deep look both obey the persisted cooldown.
 - It loads one page per site per search by default, and it waits at least 20 seconds between page loads on one site. You can allow up to 3 loads per site (price bands) in **Safety**.
 - It never logs in, and it never searches in the background. A search runs only when you click Search.
 - Photos come from the public photo CDN, which has no human check.
+
+These safeguards reduce repeat traffic; they cannot guarantee that a site will not challenge or flag a browser. For a future public tool, see the [alternative source assessment](docs/research/2026-09-25-listing-sources.md): RentCast is a structured-data pilot candidate, while REBNY RLS needs licensing and is a stronger full-product route to investigate. Neither has been added or queried.
+
+## Natural-language search edits
+
+The small OpenAI-compatible text helper from the `jev-ultrafast` setup proposes only supported settings and supplies a quote from your request for each proposed change. Jev checks the proposed limits and tiers with typed yes/no judgments and scores the explicitly mentioned priorities. Local validation rejects unknown fields, unsupported neighborhoods, invalid values, invented evidence, inconsistent ranges and malformed model responses. Uncertain changes stay unchanged and appear as clarification notes. Safety settings are not editable by the models.
+
+The helper uses the existing `TEXT_MODEL`, `TEXT_MODEL_BASE_URL`, `TEXT_MODEL_REASONING`, and `TEXT_MODEL_API_KEY` configuration. Defaults match the sibling repo: `inception/mercury-2.5` via OpenRouter, with reasoning disabled. There are normally two model requests per preview; no latency or accuracy claim has been measured for this new flow. The endpoint returns a preview without saving settings, and the UI rejects stale previews if controls changed while the models were working.
 
 ## What each pass uses
 
@@ -68,6 +78,9 @@ Jev is text only. The vision model (`google/gemini-2.5-flash-lite`) describes wh
 | `CHROME_MODE` | `user` | `user`: your Chrome (asks you to Allow). `dedicated`: a separate Chrome profile in `~/.apartment-hunter/chrome`, with no Allow popup. |
 | `VISION_MODEL` | `google/gemini-2.5-flash-lite` | Any OpenRouter model with image input |
 | `TYPESAFE_MODEL` | `jev-latest` | Jev model |
+| `TEXT_MODEL` | `inception/mercury-2.5` | Small text helper for search edits |
+| `TEXT_MODEL_BASE_URL` | `https://openrouter.ai/api/v1` | OpenAI-compatible text endpoint |
+| `TEXT_MODEL_REASONING` | `none` | Disable text-helper reasoning; any other value uses the helper’s low-reasoning mode |
 | `HUNTER_PORT` | `8777` | Local port |
 | `HUNTER_HOME` | `~/.apartment-hunter` | Database and photo cache |
 
@@ -84,7 +97,7 @@ node --check apartment_hunter/static/app.js
 uv run python scripts/browser_check.py
 ```
 
-Tests are offline and use real pages captured on 2026-09-25 (`tests/fixtures`). `scripts/browser_check.py` checks the Chrome capture and the human-check wait against local pages only. `scripts/import_sample.py --inspect 25` loads the captured pages into the database and inspects the top 25 (paid model calls, about 2 cents). `scripts/build_data.py` rebuilds the subway and area data. `scripts/fake_sites_server.py` runs the real server with a fake Chrome on port 8778, so you can test the whole page, including Search and the human-check banner, without contacting StreetEasy or Zillow.
+Tests are offline and use real pages captured on 2026-09-25 (`tests/fixtures`). `scripts/browser_check.py` checks the Chrome capture and the human-check wait against local pages only. `scripts/import_sample.py --inspect 25` loads the captured pages into the database and inspects the top 25 (paid model calls, about 2 cents). `scripts/build_data.py` rebuilds the subway and area data. `scripts/fake_sites_server.py` runs the real server with a fake Chrome on port 8778, so you can test the whole page, including Search and the human-check banner, without contacting listing sites or paid models. Its preference response is explicitly simulated and photo inspection is disabled.
 
 | File | Job |
 | --- | --- |
@@ -96,6 +109,7 @@ Tests are offline and use real pages captured on 2026-09-25 (`tests/fixtures`). 
 | [scoring.py](apartment_hunter/scoring.py) | Scores, limits, composite, tiers |
 | [vision.py](apartment_hunter/vision.py) | Photo observations |
 | [jev.py](apartment_hunter/jev.py) | Jev questions and answer checks |
+| [preferences.py](apartment_hunter/preferences.py) | Text-helper proposals, Jev validation, search-edit previews |
 | [pipeline.py](apartment_hunter/pipeline.py) | Search, inspect, and deep look jobs |
 | [server.py](apartment_hunter/server.py) | Local HTTP API and the `hunt` command |
 | [static/](apartment_hunter/static) | The page: limits, priorities, tiers, list, map |

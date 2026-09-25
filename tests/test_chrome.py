@@ -26,6 +26,7 @@ class FakeChrome:
             return {}
         if method == "Page.navigate":
             self.navigated = True
+            return {"frameId": "MAIN"}
             return {}
         if method == "Network.getResponseBody":
             body = self.bodies[params["requestId"]]
@@ -103,3 +104,45 @@ def test_old_blank_page_does_not_count_as_loaded():
     chrome.Tab(fake).load("https://example.test/search", lambda u: False, "x", settle=0.6, timeout=10)
     # Loaded only at the fourth poll (after about 1.5 s), then the settle time.
     assert time.monotonic() - started >= 2.0
+
+
+@pytest.mark.parametrize('status', [403, 429])
+def test_main_document_block_never_retries(status):
+    loaded = ['complete', 'Denied', 'Try later', False, 'https://example.test/search']
+    events = [ev('Network.responseReceived', 'doc', type='Document', frameId='MAIN',
+                 response={'url': 'https://example.test/search', 'status': status, 'headers': {'Retry-After': '3600'}})]
+    fake = FakeChrome([loaded], events, {})
+    with pytest.raises(chrome.SiteBlocked) as error:
+        chrome.Tab(fake).load('https://example.test/search', lambda u: False, 'x', settle=0)
+    assert error.value.retry_after == 3600
+    assert fake.calls.count('Page.navigate') == 1
+
+
+def test_listing_api_block_is_detected_but_ads_are_ignored():
+    loaded = ['complete', 'Results', 'listings', False, 'https://example.test/search']
+    for url, blocked in [('https://ads.test/x', False), ('https://api.example.test/', True)]:
+        events = [ev('Network.responseReceived', 'xhr', type='XHR',
+                     response={'url': url, 'status': 429})]
+        fake = FakeChrome([loaded], events, {})
+        tab = chrome.Tab(fake)
+        if blocked:
+            with pytest.raises(chrome.SiteBlocked):
+                tab.load('https://example.test/search', lambda u: 'api.example' in u, 'x', settle=0)
+        else:
+            assert tab.load('https://example.test/search', lambda u: 'api.example' in u, 'x', settle=0)['extracted']
+
+
+def test_403_human_check_still_waits_for_user():
+    check = ['complete', 'Access to this page has been denied', 'Press & Hold', True, 'https://example.test/']
+    loaded = ['complete', 'Results', 'ok', False, 'https://example.test/']
+    events = [ev('Network.responseReceived', 'doc', type='Document', frameId='MAIN',
+                 response={'url': 'https://example.test/', 'status': 403})]
+    fake = FakeChrome([check, loaded], events, {})
+    result = chrome.Tab(fake).load('https://example.test/', lambda u: False, 'x', settle=0)
+    assert result['human_check'] and fake.activated and fake.calls.count('Page.navigate') == 1
+
+
+def test_retry_after_http_date_and_invalid_header(monkeypatch):
+    monkeypatch.setattr(chrome.time, 'time', lambda: 0)
+    assert chrome.retry_after_seconds({'retry-after': 'Thu, 01 Jan 1970 01:00:00 GMT'}) == 3600
+    assert chrome.retry_after_seconds({'Retry-After': 'bad'}) == 0

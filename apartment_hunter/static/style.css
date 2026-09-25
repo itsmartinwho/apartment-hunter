@@ -580,8 +580,16 @@ a { color: var(--accent); }
 .pill:hover { border-color: #C9CFD7; color: var(--ink); }
 .pill.is-on { border-color: var(--accent); background: var(--accent); color: #FFFFFF; font-weight: 600; }
 
-.describe { display: grid; gap: 6px; margin-top: 16px; }
-.describe-actions { display: flex; align-items: center; gap: 8px; }
+.search-prompt { padding: 18px 16px; background: #F3F7F4; }
+.search-prompt h2 { margin: 0 0 10px; font-size: 14px; }
+.search-prompt .btn-primary { background: var(--accent); border-color: var(--accent); color: #FFFFFF; }
+.search-prompt .btn-primary:hover { background: #002C82; }
+.describe { display: grid; gap: 8px; }
+.describe-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.preference-preview { font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.preference-changes { padding: 0; margin: 0; list-style: none; }
+.preference-changes li { display: grid; padding: 7px 0; border-top: 1px solid var(--line); }
+.preference-notes { padding-left: 18px; margin-bottom: 0; color: var(--ink-2); }
 .describe-result { margin: 0; font-size: 12px; line-height: 1.4; }
 .describe-result.is-ok { color: var(--ink); }
 .describe-result.is-info { color: var(--ink-3); }

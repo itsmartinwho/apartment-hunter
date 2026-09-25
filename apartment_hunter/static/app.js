@@ -777,7 +777,6 @@ function buildPriorities() {
   body.replaceChildren();
   append(body, [ // append() skips null: presetsControl() is null when the server sends no presets.
     presetsControl(),
-    describeControl(),
     h('div', { class: 'section-tools' },
       h('p', { class: 'hint' }, 'Each slider sets how much a criterion counts. 0 ignores it.'),
       h('button', { type: 'button', class: 'link-btn', onclick: () => setWeights(defaultWeights()) }, 'Reset')),
@@ -803,50 +802,147 @@ function presetsControl() {
   }));
 }
 
+const LIMIT_LABELS = {
+  price_min: 'Minimum rent', price_max: 'Maximum rent', beds_min: 'Minimum bedrooms', beds_max: 'Maximum bedrooms',
+  baths_min: 'Minimum bathrooms', sqft_min: 'Minimum size', move_in_from: 'Move-in from', move_in_by: 'Move-in by',
+  strict_move_in: 'Require a known move-in date', areas: 'Areas', max_tier: 'Lowest neighborhood tier',
+  max_walk_min: 'Maximum subway walk', no_ground_floor: 'No ground floor', must_have: 'Must-haves',
+  sources: 'Sources', include_building_groups: 'Include building groups', use_net_effective: 'Use net effective rent',
+};
+
+const preferenceSnapshot = () => clone({ limits: state.limits, weights: state.weights, tiers: state.tiers });
+const preferenceSignature = () => JSON.stringify(preferenceSnapshot());
+
+function preferenceValue(group, key, value) {
+  if (value === null || value === undefined) return 'Any';
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (group === 'weights') return `${value}/10`;
+  if (group === 'tiers') return `Tier ${value}`;
+  if (key.startsWith('price_')) return fmtMoney(value);
+  if (key === 'sqft_min') return `${fmtInt(value)} ft²`;
+  if (key === 'max_walk_min') return `${value} min`;
+  if (key === 'beds_max' && value === 4) return '4+';
+  if (Array.isArray(value)) {
+    return value.map((v) => key === 'areas' ? (tree.byId.get(Number(v)) || {}).name || v
+      : key === 'sources' ? SITE_NAMES[v] || v : (state.amenities.find((a) => a.id === v) || {}).label || v).join(', ') || 'None';
+  }
+  return String(value);
+}
+
+function applyPreferences(next) {
+  state.limits = clone(next.limits);
+  state.weights = clone(next.weights);
+  state.tiers = clone(next.tiers);
+  buildLimits();
+  syncWeights();
+  syncTierEditor();
+  ['limits', 'weights', 'tiers'].forEach(changed);
+}
+
 function describeControl() {
-  const id = uid('describe');
   const text = h('textarea', {
-    id, class: 'input textarea', rows: '3', maxlength: '2000',
-    placeholder: 'For example: I work from home, so light matters most. I bike, so the subway does not matter.',
+    id: 'search-description', class: 'input textarea', rows: '4', maxlength: '2000',
+    placeholder: 'A 1-bedroom in Chelsea or West Village, under $6,500. Lots of light matters most; I don’t need a doorman.',
+    'aria-describedby': 'search-description-hint',
   });
-  const button = h('button', { type: 'button', class: 'btn btn-outline btn-small' }, 'Set priorities');
-  const result = h('p', { class: 'describe-result', hidden: true, 'aria-live': 'polite' });
+  const button = h('button', { type: 'button', class: 'btn btn-outline btn-small' }, 'Preview changes');
+  const apply = h('button', { type: 'button', class: 'btn btn-primary btn-small', hidden: true }, 'Apply changes');
+  const undo = h('button', { type: 'button', class: 'btn btn-outline btn-small', hidden: true }, 'Undo');
+  const result = h('p', { class: 'describe-result', hidden: true, role: 'status', 'aria-live': 'polite' });
+  const preview = h('div', { class: 'preference-preview', hidden: true });
+  let proposed = null;
+  let before = null;
+  let appliedSignature = null;
+  let requestId = 0;
   const show = (message, level) => {
     result.textContent = message;
     result.className = `describe-result is-${level}`;
     result.hidden = false;
   };
+  const invalidate = () => {
+    requestId += 1;
+    proposed = null;
+    apply.hidden = true;
+    preview.hidden = true;
+    result.hidden = true;
+  };
+  text.addEventListener('input', invalidate);
   const run = async () => {
-    const value = text.value.trim();
     if (button.disabled) return;
+    const value = text.value.trim();
     if (!value) {
-      show('Write what matters to you first.', 'error');
+      show('Describe what you want to change first.', 'error');
       text.focus();
       return;
     }
+    invalidate();
+    const seq = requestId;
+    const base = preferenceSnapshot();
+    const signature = JSON.stringify(base);
     button.disabled = true;
-    button.classList.add('is-busy');
+    button.textContent = 'Reading your request…';
     button.setAttribute('aria-busy', 'true');
     try {
-      const res = await api('/api/interpret', { text: value, weights: state.weights });
-      const changes = (Array.isArray(res.changes) ? res.changes : []).filter((c) => isObj(c) && isText(c.id));
-      if (changes.length) {
-        const next = { ...state.weights };
-        if (isObj(res.weights)) Object.assign(next, res.weights);
-        else changes.forEach((c) => { next[c.id] = c.to; });
-        setWeights(next);
-        show(changes.map((c) => `${criterionLabel(c.id)} ${fmtWeight(c.from)}→${fmtWeight(c.to)}`).join(' · '), 'ok');
-      } else {
-        show('No change: the text did not mention the criteria clearly.', 'info');
+      const res = await api('/api/preferences', { text: value, ...base });
+      if (seq !== requestId) return;
+      if (signature !== preferenceSignature()) {
+        show('Your settings changed while the request was being read. Preview again to use the latest settings.', 'info');
+        return;
       }
+      if (!isObj(res.limits) || !isObj(res.weights) || !isObj(res.tiers) || !Array.isArray(res.changes)) {
+        throw new Error('The server returned an invalid preview. Nothing changed.');
+      }
+      proposed = { result: res, base, signature };
+      const rows = res.changes.map((c) => {
+        const label = c.group === 'weights' ? criterionLabel(c.id)
+          : c.group === 'tiers' ? (tree.byId.get(Number(c.id)) || {}).name || c.id : LIMIT_LABELS[c.id] || c.id;
+        return h('li', { title: isText(c.evidence) ? `From your request: “${c.evidence}”` : null },
+          h('strong', null, label),
+          h('span', null, `${preferenceValue(c.group, c.id, c.from)} → ${preferenceValue(c.group, c.id, c.to)}`));
+      });
+      const notes = Array.isArray(res.notes) ? res.notes.filter(isText) : [];
+      preview.replaceChildren(rows.length ? h('ul', { class: 'preference-changes' }, rows) : null,
+        notes.length ? h('ul', { class: 'preference-notes' }, notes.map((note) => h('li', null, note))) : null);
+      preview.hidden = !rows.length && !notes.length;
+      apply.hidden = !rows.length;
+      show(rows.length ? `${rows.length} proposed change${rows.length === 1 ? '' : 's'}. Apply to re-rank saved listings.`
+        : 'No changes proposed. Try a specific limit or priority.', rows.length ? 'ok' : 'info');
     } catch (error) {
-      show(error.message, 'error');
+      if (seq === requestId) show(error.message, 'error');
     } finally {
       button.disabled = false;
-      button.classList.remove('is-busy');
+      button.textContent = 'Preview changes';
       button.removeAttribute('aria-busy');
     }
   };
+  apply.addEventListener('click', () => {
+    if (!proposed) return;
+    if (proposed.signature !== preferenceSignature()) {
+      apply.hidden = true;
+      show('Your settings changed since this preview. Preview again before applying.', 'info');
+      return;
+    }
+    before = proposed.base;
+    applyPreferences(proposed.result);
+    appliedSignature = preferenceSignature();
+    undo.hidden = false;
+    apply.hidden = true;
+    proposed = null;
+    show('Applied to saved listings. Search fetches new listings when you’re ready.', 'ok');
+  });
+  undo.addEventListener('click', () => {
+    if (appliedSignature !== preferenceSignature()) {
+      undo.hidden = true;
+      show('Settings changed after applying. Undo would overwrite those edits; adjust the controls instead.', 'info');
+      return;
+    }
+    applyPreferences(before);
+    undo.hidden = true;
+    proposed = null;
+    apply.hidden = true;
+    preview.hidden = true;
+    show('Restored your previous settings.', 'ok');
+  });
   button.addEventListener('click', run);
   text.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
@@ -855,10 +951,10 @@ function describeControl() {
     }
   });
   return h('div', { class: 'describe' },
-    h('label', { class: 'field-label', for: id }, 'Describe what matters'),
-    text,
-    h('div', { class: 'describe-actions' }, button),
-    result);
+    h('label', { class: 'visually-hidden', for: text.id }, 'Describe your search'), text,
+    h('p', { id: 'search-description-hint', class: 'field-hint' },
+      'Type or use keyboard dictation. Change limits, priorities, or neighborhood tiers. Search runs only when you click Search.'),
+    h('div', { class: 'describe-actions' }, button, apply, undo), result, preview);
 }
 
 function weightRow(c) {
@@ -921,7 +1017,7 @@ function buildSafety() {
   const body = $('#safety-body');
   safetyInputs.clear();
   body.replaceChildren(h('p', { class: 'safety-note' },
-    'StreetEasy and Zillow check for bots. The tool loads few pages, waits between them, and never answers a human check for you.'));
+    'Identical searches reuse saved data for 10 minutes. After a human check or an HTTP block, that site pauses for at least 15 minutes. No automatic retries.'));
   for (const f of SAFETY_FIELDS) {
     if (state.safety[f.key] === undefined) continue;
     const id = uid('safety');
@@ -934,7 +1030,7 @@ function buildSafety() {
   }
   const s = isObj(state.config.settings) ? state.config.settings : null;
   if (s) {
-    const facts = [['Chrome mode', s.chrome_mode], ['Photo model', s.vision_model], ['Judgment model', s.typesafe_model]]
+    const facts = [['Chrome mode', s.chrome_mode], ['Text model', s.text_model], ['Photo model', s.vision_model], ['Judgment model', s.typesafe_model]]
       .filter(([, v]) => isText(v));
     if (facts.length) body.append(h('dl', { class: 'fine-print' }, facts.map(([k, v]) => [h('dt', null, k), h('dd', null, v)])));
   }
@@ -1840,7 +1936,11 @@ function siteStats(stats) {
   return Object.entries(stats).filter(([, s]) => isObj(s) && isNum(s.found)).map(([site, s]) => {
     const name = SITE_NAMES[site] || site;
     const count = isNum(s.total) ? `${fmtInt(s.found)} of ${fmtInt(s.total)}` : fmtInt(s.found);
-    return { text: isText(s.error) ? `${name} ${count} (${s.error})` : `${name} ${count}`, error: isText(s.error) };
+    const notes = [];
+    if (s.cached_pages) notes.push(`${s.cached_pages} cached page${s.cached_pages === 1 ? '' : 's'}`);
+    if (isNum(s.cooldown_until) && s.cooldown_until * 1000 > Date.now()) notes.push('further loads paused');
+    if (isText(s.error)) notes.push(s.error);
+    return { text: `${name} ${count}${notes.length ? ` (${notes.join('; ')})` : ''}`, error: isText(s.error) };
   });
 }
 
@@ -2132,6 +2232,7 @@ async function boot() {
   }
   applyConfig(cfg);
   $('#inspect-n').value = String(state.safety.inspect_top_n || 25);
+  $('#search-prompt-body').replaceChildren(describeControl());
   buildLimits();
   buildPriorities();
   buildTierEditor();

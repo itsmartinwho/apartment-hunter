@@ -1,7 +1,7 @@
 """The real server and pipeline with a fake Chrome that serves the pages captured on 2026-09-25.
 
-Use it to test the whole UI, including Search and the human-check banner, without contacting StreetEasy or
-Zillow. It uses a separate database, so your real data stays untouched.
+Use it to test the UI, including Search, preference previews and the human-check banner, without contacting
+listing sites or paid models. It uses a separate database, so your real data stays untouched.
 
 uv run python scripts/fake_sites_server.py        # http://127.0.0.1:8778
 """
@@ -14,13 +14,41 @@ import time
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
-from apartment_hunter import server
+from apartment_hunter import server, vision
 from apartment_hunter.config import load_env, settings
 from apartment_hunter.pipeline import Hunter
 from apartment_hunter.store import Store
 
 FIXTURES = Path(__file__).resolve().parent.parent / "tests" / "fixtures"
 PORT = 8778
+
+
+def demo_preferences(text, limits, weights, tiers):
+    """A fixed demo answer for UI checks, clearly labeled; never calls a model."""
+    if not isinstance(text, str) or not text.strip():
+        raise ValueError("Describe your search first")
+    if text == 'simulate error':
+        raise ValueError('Simulated model error. Nothing changed.')
+    changes = [
+        {"group": "limits", "id": "price_max", "from": limits["price_max"], "to": 6500},
+        {"group": "limits", "id": "areas", "from": limits["areas"], "to": [115, 157]},
+        {"group": "weights", "id": "light", "from": weights["light"], "to": 10},
+    ]
+    return {"limits": {**limits, "price_max": 6500, "areas": [115, 157]},
+            "weights": {**weights, "light": 10}, "tiers": tiers,
+            "changes": [c for c in changes if c["from"] != c["to"]],
+            "notes": ["Local demo response: simulated preferences; no model calls."], "latency_ms": 0}
+
+
+def no_paid_models(*args, **kwargs):
+    raise vision.VisionError("Photo inspection is disabled in the offline demo")
+
+
+class DemoApp(server.App):
+    def post(self, path, body):
+        if path == "/api/interpret":
+            raise ValueError("The legacy priority model is disabled in the offline demo")
+        return super().post(path, body)
 
 
 class FakeTab:
@@ -68,8 +96,9 @@ def main():
         shutil.copy(real, folder / "hunter.db")
     store = Store(folder / "hunter.db")
     fake = FakeChrome()
-    hunter = Hunter(store, chrome_factory=lambda: fake)
-    app = server.App(store, hunter)
+    hunter = Hunter(store, chrome_factory=lambda: fake, observe=no_paid_models, judge=no_paid_models,
+                    download=no_paid_models)
+    app = DemoApp(store, hunter, interpret_preferences=demo_preferences)
     token = secrets.token_urlsafe(16)
     httpd = ThreadingHTTPServer(("127.0.0.1", PORT), server.make_handler(app, token, PORT))
     print(f"Fake-sites server: http://127.0.0.1:{PORT} (database copy in {folder})", flush=True)

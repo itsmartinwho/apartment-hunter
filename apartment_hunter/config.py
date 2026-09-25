@@ -27,6 +27,10 @@ def settings():
     return {
         "typesafe_key": env("TYPESAFE_API_KEY", ""),
         "typesafe_model": env("TYPESAFE_MODEL", "jev-latest"),
+        "text_key": env("TEXT_MODEL_API_KEY", ""),
+        "text_base": env("TEXT_MODEL_BASE_URL", "https://openrouter.ai/api/v1").rstrip("/"),
+        "text_model": env("TEXT_MODEL", "inception/mercury-2.5"),
+        "text_reasoning": env("TEXT_MODEL_REASONING", "none"),
         # The vision helper uses the OpenRouter key from jev-ultrafast unless a separate one is set.
         "vision_key": env("VISION_API_KEY") or env("TEXT_MODEL_API_KEY", ""),
         "vision_base": (env("VISION_BASE_URL") or env("TEXT_MODEL_BASE_URL") or "https://openrouter.ai/api/v1").rstrip("/"),

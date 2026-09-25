@@ -105,7 +105,7 @@ def test_second_search_waits_the_safety_pause(tmp_path):
     hunter.search(DEFAULT_LIMITS, DEFAULT_SAFETY)
     wait(hunter)
     assert hunter.fake_clock.slept == []
-    hunter.search(DEFAULT_LIMITS, {**DEFAULT_SAFETY, "pause_s": 20})
+    hunter.search({**DEFAULT_LIMITS, "price_max": 7400}, {**DEFAULT_SAFETY, "pause_s": 20})
     wait(hunter)
     assert 19 <= sum(hunter.fake_clock.slept) <= 21, "the second search must pause before loading a site again"
 
@@ -233,3 +233,127 @@ def test_zillow_listings_carry_unverified_must_haves(tmp_path):
     rows = hunter.store.all()
     assert all(r["unverified_must_have"] == ["Doorman"] for r in rows if r["source"] == "zillow")
     assert all(not r.get("unverified_must_have") for r in rows if r["source"] == "streeteasy")
+
+
+def test_identical_search_uses_persistent_cache_without_connecting(tmp_path):
+    hunter, fake = make(tmp_path)
+    hunter.search(DEFAULT_LIMITS, DEFAULT_SAFETY)
+    wait(hunter)
+    original = hunter.store.get(['se:5116741'])[0]
+    # A newer observation must not be overwritten by an older cached search.
+    hunter.store.upsert([{**original, 'price': 1234}])
+
+    def no_browser():
+        pytest.fail('A cached search must not connect to Chrome')
+
+    again = pipeline.Hunter(hunter.store, chrome_factory=no_browser, clock=hunter.fake_clock.now)
+    again.search(DEFAULT_LIMITS, DEFAULT_SAFETY)
+    job = wait(again)
+    assert job.status == 'done' and len(fake.loads) == 2
+    assert job.stats['streeteasy']['cached_pages'] == 1
+    assert job.stats['zillow']['page_loads'] == 0
+    assert again.store.get(['se:5116741'])[0]['price'] == 1234
+    assert job.stats['updated'] == 0
+
+
+def test_expired_search_cache_requires_explicit_search(tmp_path):
+    hunter, fake = make(tmp_path)
+    hunter.search(DEFAULT_LIMITS, DEFAULT_SAFETY)
+    wait(hunter)
+    hunter.fake_clock.t += pipeline.SEARCH_CACHE_SECONDS + 1
+    assert len(fake.loads) == 2  # Advancing time alone cannot navigate.
+    hunter.search(DEFAULT_LIMITS, DEFAULT_SAFETY)
+    assert wait(hunter).stats['zillow']['cached_pages'] == 0
+    assert len(fake.loads) == 4
+
+
+def test_human_check_cooldown_survives_restart_and_skips_browser(tmp_path):
+    hunter, fake = make(tmp_path, FakeChrome(zillow_check=True))
+    hunter.search({**DEFAULT_LIMITS, 'sources': ['zillow']}, DEFAULT_SAFETY)
+    assert wait(hunter).stats['zillow']['page_loads'] == 1
+
+    def no_browser():
+        pytest.fail('A blocked source must not connect to Chrome')
+
+    again = pipeline.Hunter(hunter.store, chrome_factory=no_browser, clock=hunter.fake_clock.now)
+    assert again.status()['source_cooldowns']['zillow']['remaining_s'] == pipeline.SOURCE_COOLDOWN_SECONDS
+    again.search({**DEFAULT_LIMITS, 'sources': ['zillow']}, DEFAULT_SAFETY)
+    job = wait(again)
+    assert 'paused' in job.stats['zillow']['error'] and job.stats['zillow']['page_loads'] == 0
+    assert len(fake.loads) == 1
+
+
+def test_resolved_human_check_stops_extra_price_bands(tmp_path):
+    class CheckedTab(FakeTab):
+        def load(self, url, *args, on_event=None, **kwargs):
+            on_event('human_check', url)
+            on_event('human_check_done', url)
+            out = super().load(url, *args, on_event=on_event, **kwargs)
+            out['human_check'] = True
+            return out
+
+    class CheckedChrome(FakeChrome):
+        def open_tab(self):
+            return CheckedTab(self)
+
+    hunter, fake = make(tmp_path, CheckedChrome())
+    hunter.search({**DEFAULT_LIMITS, 'sources': ['streeteasy']}, {**DEFAULT_SAFETY, 'page_loads_per_site': 3})
+    job = wait(hunter)
+    assert len(fake.loads) == 1 and job.stats['streeteasy']['found'] > 0
+    assert 'paused' in job.stats['streeteasy']['error']
+
+
+def test_block_honors_longer_retry_after_and_keeps_other_source(tmp_path):
+    class BlockedTab(FakeTab):
+        def load(self, url, *args, **kwargs):
+            if 'streeteasy' in url:
+                self.owner.loads.append(url)
+                raise pipeline.SiteBlocked(429, 3600)
+            return super().load(url, *args, **kwargs)
+
+    class BlockedChrome(FakeChrome):
+        def open_tab(self):
+            return BlockedTab(self)
+
+    hunter, fake = make(tmp_path, BlockedChrome())
+    hunter.search(DEFAULT_LIMITS, DEFAULT_SAFETY)
+    job = wait(hunter)
+    assert len(fake.loads) == 2 and job.stats['zillow']['found'] > 0
+    assert hunter.cooldowns['streeteasy']['until'] >= hunter.fake_clock.t + 3500
+    assert job.stats['streeteasy']['page_loads'] == 1
+
+
+def test_load_attempt_is_persisted_before_navigation(tmp_path):
+    hunter, fake = make(tmp_path)
+
+    class CheckTab(FakeTab):
+        def load(self, url, *args, **kwargs):
+            assert hunter.store.get_setting('last_load')['streeteasy'] == hunter.fake_clock.t
+            return super().load(url, *args, **kwargs)
+
+    fake.open_tab = lambda: CheckTab(fake)
+    hunter.search({**DEFAULT_LIMITS, 'sources': ['streeteasy']}, DEFAULT_SAFETY)
+    assert wait(hunter).stats['streeteasy']['found'] > 0
+
+
+def test_deep_look_respects_search_cooldown(tmp_path):
+    hunter, fake = make(tmp_path)
+    hunter.search(DEFAULT_LIMITS, DEFAULT_SAFETY)
+    wait(hunter)
+    hunter._cool_down('streeteasy', 'human check')
+    hunter.deep_look(['se:5116741'], DEFAULT_SAFETY)
+    wait(hunter)
+    assert len(fake.loads) == 2
+    assert hunter.store.get(['se:5116741'])[0]['detail'] is None
+
+
+def test_unverified_amenities_follow_current_limits_without_a_search(tmp_path):
+    hunter, fake = make(tmp_path)
+    hunter.search(DEFAULT_LIMITS, DEFAULT_SAFETY)
+    wait(hunter)
+    result = hunter.ranked({**DEFAULT_LIMITS, 'must_have': ['doorman']}, DEFAULT_WEIGHTS, {})
+    zillow = [x for x in result['listings'] if x['source'] == 'zillow']
+    assert zillow and all('Doorman' in x['unverified_must_have'] for x in zillow)
+    result = hunter.ranked(DEFAULT_LIMITS, DEFAULT_WEIGHTS, {})
+    assert all(not x['unverified_must_have'] for x in result['listings'])
+    assert len(fake.loads) == 2
