@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="hunter-token" content="__TOKEN__">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self' https://unpkg.com; img-src 'self' data: https://photos.zillowstatic.com https://server.arcgisonline.com https://unpkg.com; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Apartment Hunter</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <link rel="stylesheet" href="/style.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <h1 class="brand">Apartment Hunter</h1>
+
+    <div class="actions">
+      <button type="button" class="btn btn-primary" id="btn-search">Search</button>
+      <div class="inspect">
+        <button type="button" class="btn btn-secondary" id="btn-inspect">Inspect top</button>
+        <input type="number" class="inspect-n" id="inspect-n" min="1" max="60" step="1" value="25" aria-label="Number of listings to inspect">
+      </div>
+    </div>
+
+    <p class="wider-note" id="wider-note" hidden>Your limits are wider than the last search. Run Search to fetch more listings.</p>
+
+    <div class="status">
+      <div class="status-job" id="status-job" hidden>
+        <span class="job-icon" id="job-icon" aria-hidden="true"></span>
+        <span class="job-text" id="job-text"></span>
+        <span class="job-progress" id="job-progress"></span>
+        <button type="button" class="btn btn-small btn-quiet" id="btn-cancel">Cancel</button>
+      </div>
+      <div class="status-msg" id="status-msg" role="status" aria-live="polite"></div>
+      <details class="dropdown" id="log">
+        <summary class="dropdown-toggle" title="Show recent events">Log</summary>
+        <div class="dropdown-panel log-panel" id="log-panel"></div>
+      </details>
+    </div>
+
+    <div class="counts" id="counts" hidden></div>
+  </header>
+
+  <div class="banner" id="human-banner" role="alert" hidden>
+    <span class="banner-mark" aria-hidden="true">!</span>
+    <div class="banner-text">
+      <p class="banner-main" id="human-banner-text"></p>
+      <p class="banner-sub" id="human-banner-sub"></p>
+    </div>
+  </div>
+
+  <div class="layout">
+    <aside class="sidebar" aria-label="Limits, priorities, and settings">
+      <details class="section" open>
+        <summary><h2>Limits</h2></summary>
+        <div class="section-body" id="limits-body"></div>
+      </details>
+      <details class="section" open>
+        <summary><h2>Priorities</h2></summary>
+        <div class="section-body" id="priorities-body"></div>
+      </details>
+      <details class="section" open>
+        <summary><h2>Neighborhood tiers</h2></summary>
+        <div class="section-body" id="tiers-body"></div>
+      </details>
+      <details class="section">
+        <summary><h2>Safety</h2></summary>
+        <div class="section-body" id="safety-body"></div>
+      </details>
+    </aside>
+
+    <main class="main" id="main" data-view="split">
+      <div class="main-bar">
+        <div class="seg view-switch" role="radiogroup" aria-label="View">
+          <input class="seg-input" type="radio" name="view" id="view-list" value="list"><label class="seg-btn" for="view-list">List</label>
+          <input class="seg-input" type="radio" name="view" id="view-map" value="map"><label class="seg-btn" for="view-map">Map</label>
+          <input class="seg-input" type="radio" name="view" id="view-split" value="split" checked><label class="seg-btn" for="view-split">Split</label>
+        </div>
+        <p class="main-note" id="main-note"></p>
+      </div>
+      <div class="panes">
+        <section class="list-pane" id="list" aria-label="Ranked listings"></section>
+        <section class="map-pane" aria-label="Map of listings"><div class="map" id="map"></div></section>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

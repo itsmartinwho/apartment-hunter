@@ -1,0 +1,123 @@
+{
+ "5116741": {
+  "photos": [
+   {
+    "room": "living/dining/kitchen",
+    "notes": "Open concept living, dining, and kitchen area. A sofa, coffee table, and dining table with chairs are visible. The kitchen features two-tone cabinetry and a stainless steel range. A large window lets in natural light."
+   },
+   {
+    "room": "kitchen",
+    "notes": "Kitchen area with ample cabinetry, a sink, a stainless steel range, microwave, and refrigerator. Countertops appear to be stone. Under-cabinet lighting is on."
+   },
+   {
+    "room": "living room",
+    "notes": "Living area with a sofa, coffee table, and two accent chairs. Large windows dominate one wall. Artwork is hung on the wall."
+   },
+   {
+    "room": "bedroom",
+    "notes": "Bedroom with a bed, nightstands, and decorative wallpaper. A window is visible on the right side. A desk and chair are placed near the window."
+   },
+   {
+    "room": "bedroom",
+    "notes": "View from the bedroom showing a desk and chair by the window. A bridge is visible in the distance through the window."
+   },
+   {
+    "room": "laundry closet",
+    "notes": "Stackable washer and dryer in a closet."
+   }
+  ],
+  "view": "skyline",
+  "light": "Bright daylight from large windows in the living area and bedroom. Sunlight is visible casting shadows.",
+  "windows": "Large, expansive windows. Not floor-to-ceiling, but take up a significant portion of the wall height. Multiple windows visible in the living room and bedroom.",
+  "finishes": "Kitchen: two-tone wood and light-colored cabinets, stone countertops, stainless steel appliances (range, microwave, refrigerator). Bathroom: not clearly visible, but appears to have modern fixtures. Flooring: light wood-look flooring in the main living area and kitchen, carpet in the bedroom.",
+  "condition": "New or renovated. Surfaces appear clean and modern. Appliances look new.",
+  "space": "Appears spacious due to the open-concept layout and large windows. The furniture is well-proportioned to the space.",
+  "floor_cues": "Rooftops and skyline are visible, suggesting a higher floor.",
+  "unit_photos": "Photos appear to show the actual unit, staged with furniture.",
+  "red_flags": "none"
+ },
+ "5143431": {
+  "photos": [
+   {
+    "room": "living room",
+    "notes": "Corner unit with couch, armchair, coffee table, and television console."
+   },
+   {
+    "room": "kitchen/living area",
+    "notes": "Open concept with kitchen island, dining table, and living area."
+   },
+   {
+    "room": "bedroom",
+    "notes": "Bedroom with bed, nightstands, and dresser."
+   },
+   {
+    "room": "bedroom",
+    "notes": "Bedroom with bed, nightstands, and dresser."
+   },
+   {
+    "room": "bathroom",
+    "notes": "Bathroom with bathtub, vanity, and toilet."
+   },
+   {
+    "room": "bathroom",
+    "notes": "Bathroom with vanity, toilet, and standing shower."
+   }
+  ],
+  "view": "skyline",
+  "light": "Bright daylight from large windows in all visible rooms, illuminating the space.",
+  "windows": "Large, floor-to-ceiling windows in the living room and bedroom. Multiple windows in the kitchen and bathrooms.",
+  "finishes": {
+   "kitchen": "White countertops, light wood cabinets, stainless steel appliances.",
+   "bathroom": "Light-colored tile walls and floors. Wood vanity.",
+   "appliances": "Beko refrigerator, stainless steel oven and microwave.",
+   "flooring": "Light wood-look flooring throughout the unit, with area rugs."
+  },
+  "condition": "New or renovated, with clean surfaces and modern fixtures.",
+  "space": "Rooms appear spacious due to ample natural light and minimalist staging.",
+  "floor_cues": "Rooftops and skyline are visible through the windows, indicating a high floor.",
+  "unit_photos": "Photos show the actual unit.",
+  "red_flags": "none"
+ },
+ "5146254": {
+  "photos": [
+   {
+    "room": "Living area/hallway",
+    "notes": "View down a hallway towards a dark door. Kitchen counter with cabinets above and below is visible to the right. Parquet flooring."
+   },
+   {
+    "room": "Kitchen area",
+    "notes": "View into kitchen area through a pass-through. Stainless steel refrigerator visible. Granite countertop with sink and faucet. Wooden cabinets above and below."
+   },
+   {
+    "room": "Kitchen",
+    "notes": "Stainless steel appliances including gas range, microwave, and dishwasher. Granite countertops. Wooden cabinets. Tiled floor."
+   },
+   {
+    "room": "Living area",
+    "notes": "Large window showing buildings across the street. Air conditioning unit below the window. White baseboard heating unit to the right. Parquet flooring."
+   },
+   {
+    "room": "Bedroom",
+    "notes": "Window showing brick wall outside. White baseboard heating unit below the window. White double doors on the left. Parquet flooring."
+   },
+   {
+    "room": "Living area/bedroom",
+    "notes": "Window with brick wall visible outside. Ceiling fan with lights. Doors to hallway and another room. Parquet flooring."
+   }
+  ],
+  "view": "brick wall",
+  "light": "Good natural light in the living area from the large window. Other rooms have smaller windows providing less natural light.",
+  "windows": "One large window in the living area, one medium window in the bedroom, and one medium window in another room. Windows are not floor-to-ceiling.",
+  "finishes": {
+   "kitchen": "Granite countertops, wooden cabinets, stainless steel appliances (refrigerator, microwave, gas range, dishwasher), tiled floor.",
+   "bathroom": "Not visible.",
+   "appliances": "Stainless steel refrigerator, microwave, gas range, dishwasher.",
+   "flooring": "Parquet flooring in living areas and bedrooms, tile flooring in the kitchen."
+  },
+  "condition": "Clean but older. Floors are polished. Cabinets appear older but clean. Appliances are stainless steel.",
+  "space": "The main living area looks reasonably spacious. The bedroom appears smaller. The hallway is narrow.",
+  "floor_cues": "rooftops",
+  "unit_photos": "Photos appear to be of the actual unit.",
+  "red_flags": "none"
+ }
+}
