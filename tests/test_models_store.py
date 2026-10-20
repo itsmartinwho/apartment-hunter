@@ -9,13 +9,13 @@ from apartment_hunter.store import Store
 
 
 def se(**kw):
-    return {"id": "se:1", "source": "streeteasy", "kind": "unit", "street": "417 East 57th Street", "unit": "#7B",
+    return {"id": "se:1", "source": "streeteasy", "kind": "unit", "street": "300 Example Avenue", "unit": "#7B",
             "beds": 1, "price": 4745, "lat": 40.7587, "lon": -73.9628, "photos": ["a"], "urls": {"streeteasy": "s"},
             "sqft": None, **kw}
 
 
 def zl(**kw):
-    return {"id": "z:9", "source": "zillow", "kind": "unit", "street": "417 E 57th St", "unit": "Apt 7B", "beds": 1,
+    return {"id": "z:9", "source": "zillow", "kind": "unit", "street": "300 Example Ave", "unit": "Apt 7B", "beds": 1,
             "price": 4745, "lat": 40.7588, "lon": -73.9627, "photos": ["b", "c", "d"], "urls": {"zillow": "z"},
             "sqft": 608, **kw}
 
@@ -39,7 +39,7 @@ def test_dedupe_keeps_different_apartments_and_building_groups():
 
 
 def test_street_keys_normalize():
-    assert dedupe.street_key("417 East 57th Street") == dedupe.street_key("417 E 57th St") == "417 e 57 st"
+    assert dedupe.street_key("300 Example Avenue") == dedupe.street_key("300 Example Ave") == "300 example ave"
     assert dedupe.unit_key("Apt 7B") == dedupe.unit_key("#7B") == "7B"
 
 

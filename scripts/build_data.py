@@ -1,6 +1,9 @@
-"""Build apartment_hunter/data/*.json from open data and a captured StreetEasy page.
+"""Build apartment_hunter/data/*.json from open data and a saved StreetEasy search page.
 
-uv run python scripts/build_data.py --mta mta_stations.csv --flight tests/fixtures/streeteasy_search_flight.txt
+uv run python scripts/build_data.py --mta tests/fixtures/mta_stations.csv --flight <saved flight data>
+
+The flight data (the page's self.__next_f chunks, joined) holds the area list. It is not in tests/fixtures,
+whose sample page is synthetic; the committed data files are already built.
 
 MTA stations: https://data.ny.gov/api/views/39hk-dx4f/rows.csv?accessType=DOWNLOAD
 """

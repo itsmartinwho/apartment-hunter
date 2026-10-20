@@ -9,6 +9,7 @@ Read README.md and docs/superpowers/specs/2026-09-25-apartment-hunter-design.md 
 - Jev is text only. The vision model describes photos; Jev judges; code combines scores with the user's weights.
 - Reject invalid model output. Never guess a value.
 - Tests must not call paid APIs or listing sites. Live checks use local pages (`scripts/browser_check.py`).
+- Never commit pages captured from StreetEasy or Zillow, or anything about the user (income, address, contacts). Fixtures are synthetic (`scripts/build_sample_fixtures.py`).
 - Keep credentials in `.env` (git-ignored) and on the server side.
 - Do not commit or push unless the user asks.
 

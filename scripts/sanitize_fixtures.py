@@ -1,6 +1,8 @@
-"""Remove credential-shaped strings from captured fixtures without logging them.
+"""Remove credential-shaped strings from files in tests/fixtures without logging them.
 
-Run before committing new captures: uv run python scripts/sanitize_fixtures.py
+Captured pages are not committed (the fixtures are synthetic: scripts/build_sample_fixtures.py). This stays as a
+guard for a local capture, and as the pattern list that tests/test_fixture_hygiene.py checks:
+uv run python scripts/sanitize_fixtures.py
 Replacements preserve byte lengths because Next.js Flight can contain length-prefixed text records.
 """
 

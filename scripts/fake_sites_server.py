@@ -1,4 +1,4 @@
-"""The real server and pipeline with a fake Chrome that serves the pages captured on 2026-09-25.
+"""The real server and pipeline with a fake Chrome that serves the synthetic sample pages (tests/fixtures).
 
 Use it to test the UI, including Search, preference previews and the human-check banner, without contacting
 listing sites or paid models. It uses a separate database, so your real data stays untouched.
