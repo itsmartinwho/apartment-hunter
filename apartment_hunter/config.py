@@ -34,7 +34,7 @@ def settings():
         # The vision helper uses the OpenRouter key from jev-ultrafast unless a separate one is set.
         "vision_key": env("VISION_API_KEY") or env("TEXT_MODEL_API_KEY", ""),
         "vision_base": (env("VISION_BASE_URL") or env("TEXT_MODEL_BASE_URL") or "https://openrouter.ai/api/v1").rstrip("/"),
-        "vision_model": env("VISION_MODEL", "google/gemini-2.5-flash-lite"),
+        "vision_model": env("VISION_MODEL", "google/gemini-3.5-flash-lite"),
         "chrome_mode": env("CHROME_MODE", "user"),
         "chrome_cdp_url": env("CHROME_CDP_URL", "http://127.0.0.1:9333"),
         "port": int(env("HUNTER_PORT", "8777")),

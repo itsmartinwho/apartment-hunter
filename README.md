@@ -59,7 +59,7 @@ The helper uses the existing `TEXT_MODEL`, `TEXT_MODEL_BASE_URL`, `TEXT_MODEL_RE
 
 Every criterion score runs from 0 to 1. An unknown value counts as 0.5. The composite score is the weighted mean. Tier 1 is the top 10 percent of the listings that pass your limits, tier 2 the next 20 percent, tier 3 the next 30 percent, and tier 4 the rest.
 
-Jev is text only. The vision model (`google/gemini-2.5-flash-lite`) describes what the photos show. Jev turns that description into calibrated Scores. A Jev yes/no question checks whether the photos show the actual unit; when it is unlikely, the photo scores count less. Photo scores of Zillow building groups always count less, because their photos show the building, not your unit.
+Jev is text only. The vision model (`google/gemini-3.5-flash-lite`) describes what the photos show. Jev turns that description into calibrated Scores. A Jev yes/no question checks whether the photos show the actual unit; when it is unlikely, the photo scores count less. Photo scores of Zillow building groups always count less, because their photos show the building, not your unit.
 
 ## Limits of v1
 
@@ -76,7 +76,7 @@ Jev is text only. The vision model (`google/gemini-2.5-flash-lite`) describes wh
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `CHROME_MODE` | `user` | `user`: your Chrome (asks you to Allow). `dedicated`: a separate Chrome profile in `~/.apartment-hunter/chrome`, with no Allow popup. |
-| `VISION_MODEL` | `google/gemini-2.5-flash-lite` | Any OpenRouter model with image input |
+| `VISION_MODEL` | `google/gemini-3.5-flash-lite` | Any OpenRouter model with image input |
 | `TYPESAFE_MODEL` | `jev-latest` | Jev model |
 | `TEXT_MODEL` | `inception/mercury-2.5` | Small text helper for search edits |
 | `TEXT_MODEL_BASE_URL` | `https://openrouter.ai/api/v1` | OpenAI-compatible text endpoint |
