@@ -110,7 +110,7 @@ AMENITIES = {
 
 DEFAULT_LIMITS = {
     "price_min": 0,
-    "price_max": 7500,  # 40x rule: $300,000 income supports $7,500 a month.
+    "price_max": 7500,
     "beds_min": 1,
     "beds_max": 4,  # 4 means 4 or more.
     "baths_min": 1,

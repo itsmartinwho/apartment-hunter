@@ -25,10 +25,13 @@ def test_module_rows_are_skipped():
     assert data["1"] is None and data["2"] is None and data["3"] == {"ok": True}
 
 
-def test_real_streeteasy_page_has_14_listings():
+def test_sample_streeteasy_page_has_its_listings():
     data = rsc.parse((FIXTURES / "streeteasy_search_flight.txt").read_text())
     edges = rsc.find(list(data.values()), lambda o: str(o.get("__typename", "")).endswith("RentalEdge"))
-    assert len({e["node"]["id"] for e in edges}) == 14
+    assert len({e["node"]["id"] for e in edges}) == 7
+    # The row after a text row with non-ASCII characters is still found: lengths count UTF-8 bytes.
+    assert data["10"] == '{"summary":"Sample rentals \u2013 caf\u00e9 district"}'
+    assert data["11"]["description"].endswith("image 1 of 3")
 
 
 def test_polyline_known_value():

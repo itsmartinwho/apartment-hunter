@@ -28,7 +28,7 @@ uv run hunt --check
 5. For a listing you like, click **Deep look**. The tool opens that listing page, reads the description and all photos, and inspects it again.
 6. Edit the **neighborhood tiers** to match your taste. Tier 1 is best.
 
-The database already holds 67 real listings from pages captured on 2026-09-25, with 28 inspected, so the page shows results before your first search.
+To see the page filled before your first search, run `uv run python scripts/import_sample.py`: it loads a few synthetic sample listings (made up, not real homes).
 
 ## Safety rules
 
@@ -86,9 +86,9 @@ Jev is text only. The vision model (`google/gemini-3.5-flash-lite`) describes wh
 
 ## Development
 
-Before committing captured pages, run `uv run python scripts/sanitize_fixtures.py`. Public page payloads can
-include the listing sites' Google Maps keys; these are unrelated to your model API credentials and are
-replaced with inert, same-length placeholders. The fixture hygiene test guards against reintroducing them.
+Never commit pages captured from StreetEasy or Zillow: both sites forbid scraping and redistributing their
+pages, and the pages carry visitor ids and third-party keys. The test fixtures are synthetic pages in the sites'
+formats, written by `scripts/build_sample_fixtures.py`; the fixture hygiene test fails on anything else.
 
 ```bash
 uv run ruff check .
@@ -97,7 +97,7 @@ node --check apartment_hunter/static/app.js
 uv run python scripts/browser_check.py
 ```
 
-Tests are offline and use real pages captured on 2026-09-25 (`tests/fixtures`). `scripts/browser_check.py` checks the Chrome capture and the human-check wait against local pages only. `scripts/import_sample.py --inspect 25` loads the captured pages into the database and inspects the top 25 (paid model calls, about 2 cents). `scripts/build_data.py` rebuilds the subway and area data. `scripts/fake_sites_server.py` runs the real server with a fake Chrome on port 8778, so you can test the whole page, including Search and the human-check banner, without contacting listing sites or paid models. Its preference response is explicitly simulated and photo inspection is disabled.
+Tests are offline and use synthetic sample pages (`tests/fixtures`). `scripts/browser_check.py` checks the Chrome capture and the human-check wait against local pages only. `scripts/import_sample.py --inspect 25` loads the sample pages into the database and inspects the top 25 (paid model calls, about 2 cents; the sample photos are made up and will not download, so this is for real listings). `scripts/build_data.py` rebuilds the subway and area data. `scripts/fake_sites_server.py` runs the real server with a fake Chrome on port 8778, so you can test the whole page, including Search and the human-check banner, without contacting listing sites or paid models. Its preference response is explicitly simulated and photo inspection is disabled.
 
 | File | Job |
 | --- | --- |

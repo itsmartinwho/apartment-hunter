@@ -1,4 +1,4 @@
-"""Pipeline jobs with a fake Chrome and fake models, fed by the real captured pages. Offline."""
+"""Pipeline jobs with a fake Chrome and fake models, fed by the synthetic sample pages. Offline."""
 
 import json
 import time
@@ -14,10 +14,10 @@ from apartment_hunter.store import Store
 FIXTURES = Path(__file__).parent / "fixtures"
 SE_FLIGHT = (FIXTURES / "streeteasy_search_flight.txt").read_text()
 Z_NEXT = (FIXTURES / "zillow_search_next_data.json").read_text()
-MAP = json.dumps({"data": {"searchRentals": {"totalCount": 2872, "edges": [{"node": {
+MAP = json.dumps({"data": {"searchRentals": {"totalCount": 1500, "edges": [{"node": {
     "id": "999", "areaName": "Chelsea", "bedroomCount": 2, "fullBathroomCount": 1, "halfBathroomCount": 0,
     "geoPoint": {"latitude": 40.7465, "longitude": -73.9990}, "leadMedia": {"photo": {"key": "e" * 32}},
-    "price": 6900, "status": "ACTIVE", "street": "200 W 24th St", "unit": "#12A", "urlPath": "/building/x/12a"}}]}}})
+    "price": 6900, "status": "ACTIVE", "street": "200 Mock Street", "unit": "#12A", "urlPath": "/building/x/12a"}}]}}})
 
 
 class FakeTab:
@@ -92,11 +92,11 @@ def test_search_reads_both_sites_with_one_load_each(tmp_path):
     assert job is wait_job and job.status == "done", job.message
     assert len(fake.loads) == 2
     stats = job.stats
-    assert stats["streeteasy"]["found"] == 15 and stats["streeteasy"]["total"] == 2872
-    assert stats["zillow"]["found"] > 40
+    assert stats["streeteasy"]["found"] == 7 and stats["streeteasy"]["total"] == 1500
+    assert stats["zillow"]["found"] == 15
     ranked = hunter.ranked(DEFAULT_LIMITS, DEFAULT_WEIGHTS, {})
     ids = {x["id"] for x in ranked["listings"]}
-    assert "se:999" in ids and "se:5116741" in ids
+    assert "se:999" in ids and "se:9100001" in ids
     assert ranked["counts"]["total"] == stats["listings"] and all(x["is_new"] for x in ranked["listings"])
 
 
@@ -115,7 +115,7 @@ def test_human_check_timeout_keeps_other_site(tmp_path):
     hunter.search(DEFAULT_LIMITS, DEFAULT_SAFETY)
     job = wait(hunter)
     assert job.status == "done"
-    assert job.stats["zillow"]["error"] == "human check not completed" and job.stats["streeteasy"]["found"] == 15
+    assert job.stats["zillow"]["error"] == "human check not completed" and job.stats["streeteasy"]["found"] == 7
     assert any(e["level"] == "warn" and "human check" in e["message"] for e in hunter.events)
 
 
@@ -149,12 +149,12 @@ def test_inspect_stores_judgments_and_uses_cache(tmp_path):
     hunter, _ = make(tmp_path, observe=fake_observe, judge=fake_judge, download=lambda urls: [(b"x", "image/webp")])
     hunter.search(DEFAULT_LIMITS, DEFAULT_SAFETY)
     wait(hunter)
-    hunter.inspect(["se:5116741", "se:999"])
+    hunter.inspect(["se:9100001", "se:999"])
     job = wait(hunter)
     assert job.status == "done" and job.stats["inspected"] == 2
     top = {x["id"]: x for x in hunter.ranked(DEFAULT_LIMITS, DEFAULT_WEIGHTS, {})["listings"]}
-    assert top["se:5116741"]["scores"]["views"] == 1.0 and top["se:5116741"]["inspection"]["photos_used"] == 1
-    hunter.inspect(["se:5116741"])
+    assert top["se:9100001"]["scores"]["views"] == 1.0 and top["se:9100001"]["inspection"]["photos_used"] == 1
+    hunter.inspect(["se:9100001"])
     assert wait(hunter).stats["cached"] == 1
 
 
@@ -165,7 +165,7 @@ def test_inspect_failure_is_reported_not_fatal(tmp_path):
     hunter, _ = make(tmp_path, observe=broken, judge=fake_judge, download=lambda urls: [(b"x", "image/webp")])
     hunter.search(DEFAULT_LIMITS, DEFAULT_SAFETY)
     wait(hunter)
-    hunter.inspect(["se:5116741"])
+    hunter.inspect(["se:9100001"])
     job = wait(hunter)
     assert job.status == "done" and job.stats["failed"] == 1
 
@@ -175,12 +175,12 @@ def test_deep_look_saves_detail_then_inspects(tmp_path):
                         download=lambda urls: [(b"x", "image/webp")])
     hunter.search(DEFAULT_LIMITS, DEFAULT_SAFETY)
     wait(hunter)
-    hunter.deep_look(["se:5116741"], DEFAULT_SAFETY)
+    hunter.deep_look(["se:9100001"], DEFAULT_SAFETY)
     job = wait(hunter)
     assert job.status == "done", job.message
-    row = hunter.store.get(["se:5116741"])[0]
+    row = hunter.store.get(["se:9100001"])[0]
     assert row["detail"]["description"].startswith("Sunny renovated") and row["inspection"]
-    assert fake.loads[-1] == "https://streeteasy.com/building/the-suffolk/801"
+    assert fake.loads[-1] == "https://streeteasy.com/building/sample-house/401"
 
 
 def test_status_is_running_again_after_a_human_check_timeout(tmp_path):
@@ -203,10 +203,10 @@ def test_inspect_runs_again_after_a_deep_look_adds_a_description(tmp_path):
     hunter, _ = make(tmp_path, observe=fake_observe, judge=fake_judge, download=lambda urls: [(b"x", "image/webp")])
     hunter.search(DEFAULT_LIMITS, DEFAULT_SAFETY)
     wait(hunter)
-    hunter.inspect(["se:5116741"])
+    hunter.inspect(["se:9100001"])
     wait(hunter)
-    hunter.store.save_detail("se:5116741", {"description": "South-facing, renovated in 2025.", "photos": []})
-    hunter.inspect(["se:5116741"])
+    hunter.store.save_detail("se:9100001", {"description": "South-facing, renovated in 2025.", "photos": []})
+    hunter.inspect(["se:9100001"])
     assert wait(hunter).stats["inspected"] == 1
 
 
@@ -239,7 +239,7 @@ def test_identical_search_uses_persistent_cache_without_connecting(tmp_path):
     hunter, fake = make(tmp_path)
     hunter.search(DEFAULT_LIMITS, DEFAULT_SAFETY)
     wait(hunter)
-    original = hunter.store.get(['se:5116741'])[0]
+    original = hunter.store.get(['se:9100001'])[0]
     # A newer observation must not be overwritten by an older cached search.
     hunter.store.upsert([{**original, 'price': 1234}])
 
@@ -252,7 +252,7 @@ def test_identical_search_uses_persistent_cache_without_connecting(tmp_path):
     assert job.status == 'done' and len(fake.loads) == 2
     assert job.stats['streeteasy']['cached_pages'] == 1
     assert job.stats['zillow']['page_loads'] == 0
-    assert again.store.get(['se:5116741'])[0]['price'] == 1234
+    assert again.store.get(['se:9100001'])[0]['price'] == 1234
     assert job.stats['updated'] == 0
 
 
@@ -341,10 +341,10 @@ def test_deep_look_respects_search_cooldown(tmp_path):
     hunter.search(DEFAULT_LIMITS, DEFAULT_SAFETY)
     wait(hunter)
     hunter._cool_down('streeteasy', 'human check')
-    hunter.deep_look(['se:5116741'], DEFAULT_SAFETY)
+    hunter.deep_look(['se:9100001'], DEFAULT_SAFETY)
     wait(hunter)
     assert len(fake.loads) == 2
-    assert hunter.store.get(['se:5116741'])[0]['detail'] is None
+    assert hunter.store.get(['se:9100001'])[0]['detail'] is None
 
 
 def test_unverified_amenities_follow_current_limits_without_a_search(tmp_path):

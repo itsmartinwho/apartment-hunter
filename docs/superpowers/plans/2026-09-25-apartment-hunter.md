@@ -61,9 +61,9 @@ apartment_hunter/
   server.py          HTTP API, static files, CLI entry point
   data/subway_stations.json, data/streeteasy_areas.json
   static/index.html, static/app.js, static/style.css
-scripts/build_data.py     builds data files from MTA CSV and captured StreetEasy data
+scripts/build_data.py     builds data files from the MTA CSV and a saved StreetEasy search page
 scripts/browser_check.py  real-Chrome check against local fixture pages
-tests/fixtures/…           captured real pages
+tests/fixtures/…           synthetic sample pages (scripts/build_sample_fixtures.py) and the MTA CSV
 tests/test_*.py
 ```
 
@@ -76,7 +76,7 @@ tests/test_*.py
 - Data: `subway_stations.json` = list of `{"stop_id", "complex_id", "name", "lines": [str], "lat", "lon", "borough"}`; lines are the union for the station complex. `streeteasy_areas.json` = list of `{"id": int, "name", "short", "level", "parent_id": int, "borough", "boundary": [[lat, lon], …] | null}`.
 
 - [ ] Step 1: Write `pyproject.toml` (project `apartment-hunter`, script `hunt = "apartment_hunter.server:main"`, deps `browser-harness==0.1.13`, `httpx[http2]>=0.28,<1`; dev `pytest`, `ruff`). Run `uv sync`.
-- [ ] Step 2: Write `scripts/build_data.py`: read the MTA CSV (columns `GTFS Stop ID`, `Complex ID`, `Stop Name`, `Borough`, `Daytime Routes`, `GTFS Latitude`, `GTFS Longitude`), union lines by complex; read `tests/fixtures/streeteasy_search_flight.txt`, find the area list row, decode each `encodedBoundary` with `geo.decode_polyline`. Write both JSON files.
+- [ ] Step 2: Write `scripts/build_data.py`: read the MTA CSV (columns `GTFS Stop ID`, `Complex ID`, `Stop Name`, `Borough`, `Daytime Routes`, `GTFS Latitude`, `GTFS Longitude`), union lines by complex; read a saved StreetEasy search page (`--flight`), find the area list row, decode each `encodedBoundary` with `geo.decode_polyline`. Write both JSON files.
 - [ ] Step 3: Test `tests/test_data.py`:
 
 ```python
@@ -211,7 +211,7 @@ def test_rank_assigns_tiers_by_percentile():
 
 ## Task 6: StreetEasy source
 
-**Files:** Create `sources/streeteasy.py`; test `tests/test_streeteasy.py` (uses the captured flight fixture and a map-response fixture built from the `GetListingRental` query shape).
+**Files:** Create `sources/streeteasy.py`; test `tests/test_streeteasy.py` (uses the synthetic flight fixture and a map-response fixture built from the `GetListingRental` query shape).
 
 **Interfaces:**
 - `search_url(limits: dict) -> str`: `https://streeteasy.com/for-rent/nyc/status:open%7Carea:…%7Cprice:MIN-MAX%7Cbeds%3E=N…?sort_by=listed_desc`.
@@ -221,11 +221,11 @@ def test_rank_assigns_tiers_by_percentile():
 - `parse_map(body: str) -> dict` returns `{"listings": [...], "total": int | None}`.
 - `photo_url(key: str) -> str` (`-se_large_800_400.webp`).
 
-- [ ] Step 1: Tests: the fixture yields 14 listings with `id` `se:5116741`, `price` 6395, `net_effective` 5862, `photos` 38 URLs, `lat`/`lon` set; `total` 2872. The URL for `DEFAULT_LIMITS` contains `area:100,` and `price:-7500` and `beds%3E=1` and `available:20261115`.
+- [ ] Step 1: Tests: the fixture yields its listings with `id` `se:<number>`, `price`, `net_effective`, `photos` URLs, `lat`/`lon` set, and the page's `total`. The URL for `DEFAULT_LIMITS` contains `area:100,` and `price:-7500` and `beds%3E=1` and `available:20261115`.
 
 ## Task 7: Zillow source
 
-**Files:** Create `sources/zillow.py`; test `tests/test_zillow.py` (captured `__NEXT_DATA__`).
+**Files:** Create `sources/zillow.py`; test `tests/test_zillow.py` (synthetic `__NEXT_DATA__`).
 
 **Interfaces:**
 - `search_url(limits: dict) -> str` (`/homes/for_rent/?searchQueryState=` with `mapBounds` from the selected areas and `filterState` short keys).
@@ -233,7 +233,7 @@ def test_rank_assigns_tiers_by_percentile():
 - `parse_page(text: str) -> dict`; `parse_map(body: str) -> dict`; both return `{"listings": [...], "total": int | None}`.
 - Buildings expand to one `building_group` listing per bedroom count with `price_is_from=True`.
 
-- [ ] Step 1: Tests: fixture yields the 6 unit listings and building groups; "21 Chelsea" gives `zb:5XjKmx:1` at 6282 with 34 photos; `417 E 57th St APT 7B` gives `z:` id, price 4745, sqft 608, unit `APT 7B`.
+- [ ] Step 1: Tests: fixture yields its unit listings and building groups; a building gives `zb:<key>:<beds>` at its "from" price with its photos; a unit gives a `z:` id, its price, sqft and unit label.
 
 ## Task 8: Dedupe, store, photos, vision, Jev
 
@@ -275,4 +275,4 @@ def test_rank_assigns_tiers_by_percentile():
 ## Task 11: README and end-to-end check
 
 - [ ] Step 1: README in plain STE: what it does, setup, first run, safety rules, how ranking works, limits.
-- [ ] Step 2: Run ruff, pytest, `node --check` on JS, `scripts/browser_check.py`, and a live model check on the fixture listings. Import the captured fixtures as a first dataset so the UI has real data before the first live search.
+- [ ] Step 2: Run ruff, pytest, `node --check` on JS, `scripts/browser_check.py`, and a live model check on the fixture listings. Import the sample fixtures as a first dataset so the UI has data before the first live search.

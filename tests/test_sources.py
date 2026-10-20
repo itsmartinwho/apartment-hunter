@@ -1,4 +1,4 @@
-"""StreetEasy and Zillow parsing against real captured pages. Offline."""
+"""StreetEasy and Zillow parsing against the synthetic sample pages. Offline."""
 
 import json
 from pathlib import Path
@@ -20,19 +20,20 @@ def z_page():
 
 def test_streeteasy_page_listings_are_complete():
     page = se_page()
-    assert page["total"] == 2872 and len(page["listings"]) == 14
+    assert page["total"] == 1500 and len(page["listings"]) == 6
     by_id = {x["id"]: x for x in page["listings"]}
-    suffolk = by_id["se:5116741"]
-    assert suffolk["price"] == 6395 and suffolk["net_effective"] == 5862 and suffolk["months_free"] == 1
-    assert suffolk["area_name"] == "Lower East Side" and suffolk["area_id"] == 109
-    assert len(suffolk["photos"]) == 38 and suffolk["photos"][0].endswith("-se_large_800_400.webp")
-    assert suffolk["url"] == "https://streeteasy.com/building/the-suffolk/801"
-    assert suffolk["lat"] and suffolk["lon"] and suffolk["beds"] == 1 and suffolk["baths"] == 1
-    assert by_id["se:5164544"]["sqft"] == 713
+    first = by_id["se:9100001"]
+    assert first["price"] == 4950 and first["net_effective"] == 4538 and first["months_free"] == 1
+    assert first["area_name"] == "Lower East Side" and first["area_id"] == 109
+    assert len(first["photos"]) == 3 and first["photos"][0].endswith("-se_large_800_400.webp")
+    assert first["url"] == "https://streeteasy.com/building/sample-house/401"
+    assert first["lat"] and first["lon"] and first["beds"] == 1 and first["baths"] == 1
+    assert by_id["se:9100004"]["sqft"] == 713 and by_id["se:9100004"]["baths"] == 1.5
+    assert "se:9100007" not in by_id  # Rented: off the market.
 
 
 def test_streeteasy_net_effective_zero_means_none():
-    assert {x["id"]: x for x in se_page()["listings"]}["se:5146254"]["net_effective"] is None
+    assert {x["id"]: x for x in se_page()["listings"]}["se:9100003"]["net_effective"] is None
 
 
 def test_streeteasy_search_url_defaults():
@@ -56,17 +57,17 @@ def test_streeteasy_beds_formats():
 
 
 def test_streeteasy_map_response():
-    body = json.dumps({"data": {"searchRentals": {"search": {"criteria": "x"}, "totalCount": 2872, "edges": [
+    body = json.dumps({"data": {"searchRentals": {"search": {"criteria": "x"}, "totalCount": 1500, "edges": [
         {"node": {"id": "1", "areaName": "Chelsea", "bedroomCount": 1, "buildingType": "RENTAL",
                   "fullBathroomCount": 1, "geoPoint": {"latitude": 40.745, "longitude": -73.998},
                   "halfBathroomCount": 1, "leadMedia": {"photo": {"key": "a" * 32}}, "price": 5100,
-                  "totalMonthlyPrice": None, "sourceGroupLabel": "X", "status": "ACTIVE", "street": "1 W 20th St",
+                  "totalMonthlyPrice": None, "sourceGroupLabel": "X", "status": "ACTIVE", "street": "1 Mock Street",
                   "unit": "#5A", "urlPath": "/building/x/5a", "tier": None}},
         {"node": {"id": "2", "status": "RENTED", "price": 1}},
         {"node": None},
     ]}}})
     out = streeteasy.parse_map(body)
-    assert out["total"] == 2872 and len(out["listings"]) == 1
+    assert out["total"] == 1500 and len(out["listings"]) == 1
     item = out["listings"][0]
     assert item["id"] == "se:1" and item["baths"] == 1.5 and item["detail_level"] == "map"
     assert item["photos"] == [f"https://photos.zillowstatic.com/fp/{'a' * 32}-se_large_800_400.webp"]
@@ -91,20 +92,31 @@ def test_streeteasy_detail_reads_description_and_photos():
 def test_zillow_page_units_and_buildings():
     page = z_page()
     by_id = {x["id"]: x for x in page["listings"]}
-    assert page["total"] == 2923
-    chelsea = by_id["zb:5XjKmx:1"]
-    assert chelsea["kind"] == "building_group" and chelsea["price"] == 6282 and chelsea["price_is_from"]
-    assert chelsea["title"] == "21 Chelsea" and len(chelsea["photos"]) == 34 and chelsea["lat"]
-    unit = next(x for x in page["listings"] if x["title"] == "417 E 57th St Apt 7B")
+    assert page["total"] == 2500
+    tower = by_id["zb:Smp001:1"]
+    assert tower["kind"] == "building_group" and tower["price"] == 5200 and tower["price_is_from"]
+    assert tower["title"] == "Sample Tower" and len(tower["photos"]) == 4 and tower["lat"]
+    unit = next(x for x in page["listings"] if x["title"] == "123 Example Ave Apt 7B")
     assert unit["kind"] == "unit" and unit["price"] == 4745 and unit["sqft"] == 608
-    assert unit["street"] == "417 E 57th St" and unit["unit"] == "Apt 7B" and unit["beds"] == 1
+    assert unit["street"] == "123 Example Ave" and unit["unit"] == "Apt 7B" and unit["beds"] == 1
     assert unit["url"].startswith("https://www.zillow.com/")
 
 
 def test_zillow_page_counts():
     listings = z_page()["listings"]
-    assert sum(1 for x in listings if x["kind"] == "unit") == 6
-    assert sum(1 for x in listings if x["kind"] == "building_group") >= 40
+    assert sum(1 for x in listings if x["kind"] == "unit") == 4
+    assert sum(1 for x in listings if x["kind"] == "building_group") == 11
+    ids = {x["id"] for x in listings}
+    # A room for rent, a unit without a price and a building without units add no groups.
+    assert "zb:Smp002:3" not in ids and not any(i.startswith("zb:Smp006") for i in ids)
+    assert not any(x["price"] == 900 for x in listings)
+
+
+def test_zillow_photo_falls_back_to_the_lead_image():
+    key = "d" * 32
+    result = {"zpid": "7", "unformattedPrice": 3000, "addressStreet": "1 Mock Street Apt 2", "beds": 1,
+              "imgSrc": f"https://photos.zillowstatic.com/fp/{key}-p_e.jpg", "detailUrl": "/homedetails/x/7_zpid/"}
+    assert zillow.normalize(result)[0]["photos"] == [zillow.photo_url(key)]
 
 
 def test_zillow_money():

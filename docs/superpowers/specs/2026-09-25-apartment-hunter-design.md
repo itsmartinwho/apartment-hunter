@@ -15,7 +15,7 @@ One local web page where you set hard limits and priorities, click Search, and g
 - Output: links in tiers from best to worst, with photo and location, and a map with the tiers.
 - Two passes: cheap deterministic data for a long list, then vision for a shortlist.
 - Every option has a schema with rankings.
-- Defaults from the user: single, $300,000 income, 1 bedroom or more, Manhattan plus close Brooklyn, move-in late October to mid-November 2026.
+- Defaults: 1 bedroom or more, Manhattan plus close Brooklyn, move-in late October to mid-November 2026.
 - Safety: do not get the user's IP or Chrome flagged. Never log in to any account.
 
 ## Findings that shape the design
@@ -96,7 +96,7 @@ scoring.py and criteria.py: one schema for every criterion, used by server and U
 Every listing is a flat JSON object:
 
 ```text
-id            "se:5116741" | "z:452682722" | "zb:5XjKmx:1" (Zillow building, 1-bedroom group)
+id            "se:1234567" | "z:12345678" | "zb:AbC123:1" (Zillow building, 1-bedroom group)
 source        "streeteasy" | "zillow"
 kind          "unit" | "building_group"
 url, title, street, unit, zip
@@ -181,7 +181,7 @@ The user picks listings. The tool loads each detail page, one at a time, at leas
 
 ## Testing
 
-- Offline tests with real captured pages (StreetEasy flight data, Zillow page data, vision output). No paid API calls in tests.
+- Offline tests with synthetic pages in the sites' formats (StreetEasy flight data, Zillow page data). No real captures are committed. No paid API calls in tests.
 - A local fixture site served by the tool's server imitates both sites, including a human-check page, for a browser test without touching the real sites.
 - Live checks only for the models (cheap) tonight. The first live search runs when the user is present.
 

@@ -1,4 +1,4 @@
-"""Load the search pages captured on 2026-09-25 into the local database, so the UI has real listings before
+"""Load the synthetic sample search pages (tests/fixtures) into the local database, so the UI has listings before
 the first live search. No listing site is contacted. --inspect N also runs pass 2 (paid model calls, cents).
 
 uv run python scripts/import_sample.py --inspect 25
@@ -29,7 +29,7 @@ def main():
     se = streeteasy.parse_page((FIXTURES / "streeteasy_search_flight.txt").read_text())
     z = zillow.parse_page((FIXTURES / "zillow_search_next_data.json").read_text())
     listings = dedupe.merge([enrich.enrich(x) for x in se["listings"] + z["listings"]])
-    run = store.add_run("sample", {"source": "pages captured 2026-09-25"})
+    run = store.add_run("sample", {"source": "synthetic sample pages"})
     new, updated = store.upsert(listings)
     store.finish_run(run, {"new": new, "updated": updated})
     print(f"Imported {len(listings)} listings ({new} new) into {home / 'hunter.db'}")
