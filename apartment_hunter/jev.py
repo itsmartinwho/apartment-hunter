@@ -7,6 +7,7 @@ Code combines the normalized scores with the user's weights (TypeSafe's composit
 import math
 import time
 
+from . import photos
 from .client import ModelError, post_json
 from .config import settings
 from .criteria import CRITERIA
@@ -97,21 +98,32 @@ def state_for(listing, observations, photos_seen):
     }
 
 
-def judge(listing, observations, photos_seen):
-    """Returns (judgments, meta). Raises JevError; never invents a value."""
+def judge(listing, observations, photos_seen, images=None):
+    """Returns (judgments, meta). Raises JevError; never invents a value.
+
+    When `images` is passed (Jev 1.14+ native multimodal mode), embeds base64 data URIs
+    under `assets` with UUIDv4 references in `state.listing_photos` and sends
+    `TypeSafe-Danger-Zone-Images: true`.
+    """
     s = settings()
     if not s["typesafe_key"]:
         raise JevError("Set TYPESAFE_API_KEY in .env for Jev judgments")
-    body = {"model": s["typesafe_model"], "state": state_for(listing, observations, photos_seen),
-            "questions": QUESTIONS}
+    state = state_for(listing, observations, photos_seen)
+    body = {"model": s["typesafe_model"], "state": state, "questions": QUESTIONS}
+    extra_headers = None
+    if images:
+        assets, refs = photos.build_jev_assets(images)
+        state["listing_photos"] = refs
+        body["assets"] = assets
+        extra_headers = {"TypeSafe-Danger-Zone-Images": "true"}
     started = time.perf_counter()
     try:
-        result = post_json(URL, s["typesafe_key"], body)
+        result = post_json(URL, s["typesafe_key"], body, extra_headers=extra_headers)
     except ModelError as error:
         raise JevError(str(error)) from None
     judgments = validate(result.get("answers"))
     meta = {"model": result.get("model"), "latency_ms": round((time.perf_counter() - started) * 1000),
-            "usage": result.get("usage", {})}
+            "usage": result.get("usage", {}), "direct_images": bool(images)}
     return judgments, meta
 
 

@@ -2,6 +2,8 @@
 
 Apartment Hunter ranks New York rentals from StreetEasy and Zillow by your own priorities. You set hard limits and weights on one local page. The tool reads the listings through your Chrome, adds data it computes itself (subway walk, neighborhood tier, floor), and checks photos with a vision model and Jev. The result is a tiered list and a map.
 
+![Apartment Hunter UI](docs/screenshot.png)
+
 ## Start
 
 ```bash
@@ -59,7 +61,9 @@ The helper uses the existing `TEXT_MODEL`, `TEXT_MODEL_BASE_URL`, `TEXT_MODEL_RE
 
 Every criterion score runs from 0 to 1. An unknown value counts as 0.5. The composite score is the weighted mean. Tier 1 is the top 10 percent of the listings that pass your limits, tier 2 the next 20 percent, tier 3 the next 30 percent, and tier 4 the rest.
 
-Jev is text only. The vision model (`google/gemini-3.5-flash-lite`) describes what the photos show. Jev turns that description into calibrated Scores. A Jev yes/no question checks whether the photos show the actual unit; when it is unlikely, the photo scores count less. Photo scores of Zillow building groups always count less, because their photos show the building, not your unit.
+By default, the vision model (`google/gemini-3.8-flash`) describes what the photos show, and Jev turns that description into calibrated Scores. Alternatively, with **TypeSafe Jev 1.14+ native image support** (`TYPESAFE_IMAGES=1` or `VISION_MODEL=jev`), listing photos are passed directly to `/v1/systemone` via the `assets` dictionary (`data:image/jpeg;base64,...`) and UUIDv4 references in `state.listing_photos` with the `TypeSafe-Danger-Zone-Images: true` header. A Jev yes/no question checks whether the photos show the actual unit; when it is unlikely, the photo scores count less. Photo scores of Zillow building groups always count less, because their photos show the building, not your unit.
+
+Each listing card also shows **True Monthly Cost & Move-In Cash** (`net effective`, `$/ft²/yr`, and estimated move-in cash = 1st month + 1 month security deposit) and a **Compare** button to compare up to 3 apartments side-by-side at the top of the list.
 
 ## Limits of v1
 
@@ -76,7 +80,8 @@ Jev is text only. The vision model (`google/gemini-3.5-flash-lite`) describes wh
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `CHROME_MODE` | `user` | `user`: your Chrome (asks you to Allow). `dedicated`: a separate Chrome profile in `~/.apartment-hunter/chrome`, with no Allow popup. |
-| `VISION_MODEL` | `google/gemini-3.5-flash-lite` | Any OpenRouter model with image input |
+| `VISION_MODEL` | `google/gemini-3.8-flash` | Any OpenRouter model with image input (or `jev` for direct Jev 1.14+ image scoring) |
+| `TYPESAFE_IMAGES` | `0` | Set `1` to send listing photos directly to TypeSafe Jev 1.14+ (`assets` + `TypeSafe-Danger-Zone-Images: true`) |
 | `TYPESAFE_MODEL` | `jev-latest` | Jev model |
 | `TEXT_MODEL` | `inception/mercury-2.5` | Small text helper for search edits |
 | `TEXT_MODEL_BASE_URL` | `https://openrouter.ai/api/v1` | OpenAI-compatible text endpoint |

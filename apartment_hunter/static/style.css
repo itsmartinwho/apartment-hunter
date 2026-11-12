@@ -1030,3 +1030,54 @@ a { color: var(--accent); }
 
   .job-icon { border-color: #FFFFFF; }
 }
+
+/* Side-by-side comparison tray */
+.compare-tray {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+.compare-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 12.5px;
+}
+.compare-table-wrap { overflow-x: auto; }
+.compare-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.compare-table th,
+.compare-table td {
+  padding: 5px 8px;
+  border-top: 1px solid var(--line-2);
+  text-align: left;
+  vertical-align: top;
+}
+.compare-table thead th {
+  border-top: 0;
+  font-weight: 650;
+  color: var(--ink);
+}
+.compare-table tbody th {
+  color: var(--ink-3);
+  font-weight: 500;
+  width: 155px;
+}
+.compare-col-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.text-btn.is-comparing {
+  color: var(--accent);
+  font-weight: 650;
+}

@@ -11,10 +11,13 @@ class ModelError(RuntimeError):
     pass
 
 
-def post_json(url, key, body, attempts=3):
+def post_json(url, key, body, attempts=3, extra_headers=None):
+    headers = {"Authorization": f"Bearer {key}"}
+    if extra_headers:
+        headers.update(extra_headers)
     for attempt in range(attempts):
         try:
-            response = CLIENT.post(url, json=body, headers={"Authorization": f"Bearer {key}"})
+            response = CLIENT.post(url, json=body, headers=headers)
         except httpx.HTTPError as error:
             if attempt < attempts - 1:
                 time.sleep(0.5 * 2**attempt)

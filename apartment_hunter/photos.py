@@ -2,6 +2,7 @@
 
 import base64
 import hashlib
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 
 import httpx
@@ -57,3 +58,14 @@ def data_url(content, mime):
 
 def photo_set_hash(urls):
     return hashlib.sha1("|".join(urls).encode()).hexdigest()[:16]
+
+
+def build_jev_assets(images):
+    """Build TypeSafe System One (Jev 1.14+) multimodal assets dict and state photo references."""
+    assets = {}
+    refs = []
+    for content, mime in images or []:
+        asset_id = str(uuid.uuid4())
+        assets[asset_id] = data_url(content, mime)
+        refs.append({"photo": asset_id})
+    return assets, refs

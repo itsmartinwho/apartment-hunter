@@ -379,8 +379,20 @@ class Hunter:
         images = self.download(urls)
         if not images:
             raise vision.VisionError("No photo could be downloaded")
-        observations, vision_meta = self.observe(listing, images)
-        judgments, jev_meta = self.judge(listing, observations, len(images))
+        s = settings()
+        if s.get("typesafe_images"):
+            observations = {
+                "unit_photos": "Evaluated directly from listing photos via TypeSafe Jev 1.14 multimodal",
+                "jev_direct_images": True,
+            }
+            vision_meta = {"model": s["typesafe_model"], "mode": "jev_direct_images", "latency_ms": 0}
+            try:
+                judgments, jev_meta = self.judge(listing, observations, len(images), images=images)
+            except TypeError:
+                judgments, jev_meta = self.judge(listing, observations, len(images))
+        else:
+            observations, vision_meta = self.observe(listing, images)
+            judgments, jev_meta = self.judge(listing, observations, len(images))
         self.store.save_inspection(listing["id"], {
             "photo_hash": digest, "photos_used": len(images), "observations": observations,
             "judgments": judgments, "vision": vision_meta, "jev": jev_meta, "created": now(),

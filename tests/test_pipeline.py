@@ -357,3 +357,37 @@ def test_unverified_amenities_follow_current_limits_without_a_search(tmp_path):
     result = hunter.ranked(DEFAULT_LIMITS, DEFAULT_WEIGHTS, {})
     assert all(not x['unverified_must_have'] for x in result['listings'])
     assert len(fake.loads) == 2
+
+
+def test_jev_multimodal_assets_and_direct_image_mode(tmp_path, monkeypatch):
+    from apartment_hunter import photos
+
+    assets, refs = photos.build_jev_assets([(b"fakejpeg", "image/jpeg")])
+    assert len(assets) == 1 and len(refs) == 1
+    asset_id = refs[0]["photo"]
+    assert assets[asset_id].startswith("data:image/jpeg;base64,")
+
+    monkeypatch.setenv("TYPESAFE_IMAGES", "1")
+    seen_images = []
+
+    def fake_judge(listing, observations, photos_seen, images=None):
+        seen_images.append(images)
+        return (
+            {"views": {"score": 0.9}, "light": {"score": 0.8}, "windows": {"score": 0.8},
+             "renovation": {"score": 0.9}, "space": {"score": 0.7}, "floor_estimate": {"score": 0.67},
+             "real_unit": {"p": 0.95}},
+            {"model": "jev-1.14.0", "latency_ms": 120, "direct_images": True},
+        )
+
+    hunter, _ = make(
+        tmp_path,
+        download=lambda urls: [(b"fakejpeg", "image/jpeg")],
+        observe=lambda *a: (_ for _ in ()).throw(AssertionError("observe should be skipped in TYPESAFE_IMAGES=1")),
+        judge=fake_judge,
+    )
+    hunter.search({**DEFAULT_LIMITS, "sources": ["streeteasy"]}, DEFAULT_SAFETY)
+    wait(hunter)
+    hunter.inspect(["se:9100001"])
+    job = wait(hunter)
+    assert job.status == "done" and job.stats["inspected"] == 1
+    assert len(seen_images) == 1 and seen_images[0] == [(b"fakejpeg", "image/jpeg")]

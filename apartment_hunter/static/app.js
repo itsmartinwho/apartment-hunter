@@ -258,6 +258,7 @@ const state = {
   selectedId: null,
   photoIndex: new Map(), // listing id -> index of the photo the card shows
   openDetails: new Set(), // listing ids with the full description open
+  compareIds: [], // up to 3 listing ids compared side-by-side
   pendingFit: false,
   fitOnShow: false,
 };
@@ -1168,6 +1169,10 @@ function renderList() {
     return;
   }
   const frag = document.createDocumentFragment();
+  if (state.compareIds.length > 0) {
+    const tray = compareTrayBlock();
+    if (tray) frag.append(tray);
+  }
   let budget = state.renderLimit;
   for (const [tier, items] of groupedListings()) {
     if (!items.length || budget <= 0) continue;
@@ -1299,15 +1304,65 @@ function placeLine(l) {
     areaTier ? h('span', { class: 'area-tier', title: `Neighborhood tier ${areaTier}, from your tier settings` }, `T${areaTier}`) : null);
 }
 
+function toggleCompare(id) {
+  const idx = state.compareIds.indexOf(id);
+  if (idx >= 0) {
+    state.compareIds.splice(idx, 1);
+  } else {
+    if (state.compareIds.length >= 3) state.compareIds.shift();
+    state.compareIds.push(id);
+  }
+  renderList();
+}
+
+function compareTrayBlock() {
+  const items = state.compareIds.map((id) => state.byId.get(id)).filter(Boolean);
+  if (!items.length) return null;
+  const rows = [
+    ['Overall Score', (l) => (scoreOf(l) === null ? '—' : `${scoreOf(l)} / 100 (#${fmtInt(l.rank || 0)})`)],
+    ['Neighborhood', (l) => [l.area_name || l.borough || '—', neighborhoodTier(l) ? `T${neighborhoodTier(l)}` : null].filter(Boolean).join(' · ')],
+    ['Gross Rent', (l) => (isNum(l.price) ? `${fmtMoney(l.price)}/mo` : '—')],
+    ['Net Effective', (l) => (isNum(l.net_effective) && l.net_effective > 0 ? `${fmtMoney(l.net_effective)}/mo` : isNum(l.price) ? `${fmtMoney(l.price)}/mo` : '—')],
+    ['Est. Move-In Cash (1st + Sec.)', (l) => (isNum(l.price) ? fmtMoney(l.price * 2) : '—')],
+    ['Space & Layout', (l) => {
+      const b = isNum(l.beds) ? (l.beds === 0 ? 'Studio' : `${l.beds}BR`) : '—';
+      const ba = isNum(l.baths) ? `${l.baths}BA` : '';
+      const sq = isNum(l.sqft) && l.sqft > 0 ? `${fmtInt(l.sqft)} ft²` : isNum(l.sqft_estimated) && l.sqft_estimated > 0 ? `~${fmtInt(l.sqft_estimated)} ft²` : '';
+      return [b, ba, sq].filter(Boolean).join(' · ');
+    }],
+    ['Nearest Subway', (l) => (isObj(l.subway) && isNum(l.subway.walk_min) ? `${Math.max(1, Math.round(l.subway.walk_min))} min · ${l.subway.station || ''}` : '—')],
+    ['Photo Inspection (Jev)', (l) => (isObj(l.inspection) ? `Inspected (${l.inspection.photos_used || 0} photos)` : 'Not inspected')],
+  ];
+  return h('section', { class: 'compare-tray', 'aria-label': 'Side-by-side apartment comparison' },
+    h('div', { class: 'compare-head' },
+      h('strong', null, `Comparing ${items.length} of 3 apartments`),
+      h('button', { type: 'button', class: 'text-btn', onclick: () => { state.compareIds = []; renderList(); } }, 'Clear comparison')),
+    h('div', { class: 'compare-table-wrap' },
+      h('table', { class: 'compare-table' },
+        h('thead', null,
+          h('tr', null,
+            h('th', null, 'Metric'),
+            items.map((l) => h('th', null,
+              h('div', { class: 'compare-col-head' },
+                h('span', null, listingTitle(l)),
+                h('button', { type: 'button', class: 'text-btn', 'aria-label': `Remove ${listingTitle(l)}`, onclick: () => toggleCompare(l.id) }, '×')))))),
+        h('tbody', null,
+          rows.map(([label, fn]) => h('tr', null,
+            h('th', { scope: 'row' }, label),
+            items.map((l) => h('td', null, fn(l)))))))));
+}
+
 function priceLine(l) {
   const deal = [];
   if (isNum(l.net_effective) && isNum(l.price) && l.net_effective > 0 && l.net_effective < l.price) deal.push(`net ${fmtMoney(l.net_effective)}`);
   if (isNum(l.months_free) && l.months_free > 0) deal.push(`${plural(l.months_free, 'month')} free`);
+  if (isNum(l.price) && isNum(l.sqft) && l.sqft > 0) deal.push(`$${Math.round((l.price * 12) / l.sqft)}/ft²/yr`);
+  if (isNum(l.price) && l.price > 0) deal.push(`move-in ~${fmtMoney(l.price * 2)}`);
   return h('div', { class: 'card-price' },
     h('span', { class: 'price-main' },
       l.price_is_from ? h('span', { class: 'price-from' }, 'from ') : null,
       isNum(l.price) ? fmtMoney(l.price) : 'Price unknown'),
-    deal.length ? h('span', { class: 'price-deal', title: isNum(l.lease_months) ? `On a ${fmtInt(l.lease_months)}-month lease` : null }, deal.join(' · ')) : null);
+    deal.length ? h('span', { class: 'price-deal', title: isNum(l.lease_months) ? `On a ${fmtInt(l.lease_months)}-month lease (est. move-in = 1st month + 1 month deposit)` : 'Est. move-in = 1st month + 1 month security deposit' }, deal.join(' · ')) : null);
 }
 
 function factsLine(l) {
@@ -1500,9 +1555,17 @@ function sourceLinks(l) {
 
 function footBlock(l) {
   const links = sourceLinks(l);
+  const comparing = state.compareIds.includes(l.id);
   return h('div', { class: 'card-foot' },
     h('div', { class: 'card-links' }, links.length ? links : h('span', { class: 'hint' }, 'No link')),
     h('div', { class: 'card-actions' },
+      h('button', {
+        type: 'button',
+        class: `text-btn${comparing ? ' is-comparing' : ''}`,
+         'aria-pressed': String(comparing),
+        onclick: () => toggleCompare(l.id),
+        title: 'Compare up to 3 apartments side by side',
+      }, comparing ? '✓ Comparing' : 'Compare'),
       h('button', { type: 'button', class: 'text-btn js-deep', disabled: isActive(state.job), title: DEEP_TITLE, onclick: () => deepLook(l.id) }, 'Deep look'),
       hasPoint(l)
         ? h('button', { type: 'button', class: 'text-btn', onclick: () => showOnMap(l.id) }, 'Show on map')
